@@ -357,6 +357,10 @@ tbody tr:hover{background:var(--surface2);}
       <div class="nav-item fx-nav" data-p="fxapp" onclick="nav('fxapp')">
         <span class="nav-icon">🧩</span><span class="nav-label">FX Deal Page</span></div>
       <div class="nav-divider"></div>
+      <div class="nav-section"><span class="nav-section-lbl">Analytics</span></div>
+      <div class="nav-item" data-p="savings" onclick="nav('savings')">
+        <span class="nav-icon">💰</span><span class="nav-label">Savings</span></div>
+      <div class="nav-divider"></div>
       <div class="nav-section admin-nav"><span class="nav-section-lbl">Admin</span></div>
       <div class="nav-item admin-nav" data-p="rate" onclick="nav('rate')">
         <span class="nav-icon">💲</span><span class="nav-label">Daily Rate</span></div>
@@ -429,7 +433,7 @@ var KEY = 'sb_publishable_JXQkSHzlHv_Bm0IbNoMQ-Q_egZ4-N0j';
 var FX_KEY = 'cc7738b264674098a332fbf66ef8adad';
 var ADMIN_PWD = '987';
 var SETTLE_MINS = 60;
-var COS = [{id:'NVR',n:'Novaris'},{id:'MDS',n:'Medspire'},{id:'ARC',n:'Arcon'},{id:'SWN',n:'Swenston'}];
+var COS = [{id:'NVR',n:'Novaris',short:'NOV'},{id:'MDS',n:'Medspire',short:'MED'},{id:'ARC',n:'Arcon',short:'ARC'},{id:'SWN',n:'Swenston',short:'SWE'}];
 
 /* ── STATE ── */
 var CU=null, CPage='dashboard', pwdCB=null, settleId=null;
@@ -491,7 +495,7 @@ async function doLogin(){
     if(!rows.length){throw new Error('No active account found');}
     if(String(rows[0].pin)!==String(pin)){throw new Error('Incorrect PIN');}
     CU=rows[0];
-    localStorage.setItem('grf_sso',JSON.stringify({id:CU.id,name:CU.name,email:CU.email,role:CU.role,co:CU.company_code||'',exp:Date.now()+8*3600000}));
+    localStorage.setItem('grf_sso',JSON.stringify({id:CU.id,name:CU.name,email:CU.email,role:CU.role,co:CU.company_code||'',fx:CU.can_view_fx_deal_page===true,exp:Date.now()+8*3600000}));
     logAudit('LOGIN','user',CU.id,'Login');
     startApp();
   }catch(e){errEl.textContent=e.message;errEl.style.display='block';btn.textContent='Sign In →';btn.disabled=false;}
@@ -513,9 +517,10 @@ function startApp(){
   document.getElementById('tbUser').textContent=CU.name;
   var rp=document.getElementById('tbRole');rp.textContent=CU.role.replace(/_/g,' ');rp.className='rpill '+CU.role;
   var isAdmin=CU.role==='admin'||CU.role==='super_admin';
-  var canFx=isAdmin||CU.role==='fx_trader';
+  var canViewFxDealPage=CU.can_view_fx_deal_page===true||isAdmin||CU.role==='fx_trader';
   document.querySelectorAll('.admin-nav').forEach(function(e){e.style.display=isAdmin?'':'none';});
-  document.querySelectorAll('.fx-nav').forEach(function(e){e.style.display=canFx?'':'none';});
+  document.querySelectorAll('.fx-nav').forEach(function(e){e.style.display=canViewFxDealPage?'':'none';});
+  var mbnFx=document.getElementById('mbn-fxapp'); if(mbnFx)mbnFx.style.display=canViewFxDealPage?'flex':'none';
   applyTheme();nav('dashboard');
 }
 
@@ -526,7 +531,7 @@ function nav(page){
   document.querySelectorAll('.mbn-item[id]').forEach(function(e){e.classList.toggle('active',e.id==='mbn-'+page);});
   var m=document.getElementById('mainArea');
   m.innerHTML='<div class="empty"><div class="empty-icon">⏳</div></div>';
-  var pages={dashboard:pgDash,matching:pgMatch,settlements:pgSettle,submit:pgSubmit,myrequests:pgMyReqs,dealentry:pgDealEntry,dealdash:pgDealDash,dealhistory:pgDealHistory,fxapp:pgFxExternal,rate:pgRate,users:pgUsers,groups:pgGroups,audit:pgAudit};
+  var pages={dashboard:pgDash,matching:pgMatch,settlements:pgSettle,submit:pgSubmit,myrequests:pgMyReqs,dealentry:pgDealEntry,dealdash:pgDealDash,dealhistory:pgDealHistory,fxapp:pgFxExternal,rate:pgRate,users:pgUsers,groups:pgGroups,audit:pgAudit,savings:pgSavings};
   if(pages[page])pages[page]();else m.innerHTML='<div class="alert warn">Page not found: '+page+'</div>';
 }
 
@@ -541,6 +546,9 @@ function pgFxExternal(){
       '<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">'+
         '<button class="btn btn-primary" onclick="openFxPage()">Open FX Deal Page</button>'+
         '<button class="btn btn-ghost" onclick="nav(\'dashboard\')">Return to Dashboard</button>'+
+      '</div>'+
+      '<div style="margin-top:16px;">'+
+        '<a href="https://www.fxstreet.com/rates-charts/rates" target="_blank" rel="noopener noreferrer" style="color:var(--accent);font-size:13px;text-decoration:underline;">FX Street — Live Rates &amp; Charts ↗</a>'+
       '</div>'+
     '</div>';
   openFxPage();
@@ -577,7 +585,8 @@ function badge(cls,txt){return '<span class="badge '+cls+'">'+txt+'</span>';}
 /* ── Pip helpers ── */
 var FX_CFG={
   'EUR/USD':{c1:'EUR',c2:'USD',label:'EUR / USD',pm:10000,dec:5,mn:.5,mx:3,thres:[5,7,8,9]},
-  'USD/ZAR':{c1:'USD',c2:'ZAR',label:'USD / ZAR',pm:100,dec:4,mn:10,mx:25,thres:[20,25,30,35]}
+  'USD/ZAR':{c1:'USD',c2:'ZAR',label:'USD / ZAR',pm:100,dec:4,mn:10,mx:25,thres:[20,25,30,35]},
+  'ZAR/USD':{c1:'ZAR',c2:'USD',label:'ZAR / USD',pm:100,dec:4,mn:10,mx:25,thres:[20,25,30,35]}
 };
 function pipCls(p,pair){var t=(FX_CFG[pair||'EUR/USD']||FX_CFG['EUR/USD']).thres;return p<t[0]?'stellar':p<=t[1]?'ok':p<=t[2]?'caution':p<=t[3]?'warn':'bad';}
 function pipLbl(c){return{stellar:'Favourable',ok:'Satisfactory',caution:'Concerning',warn:'High Margin',bad:'Red Flag'}[c]||c;}
@@ -606,22 +615,25 @@ function dealDateLbl(d){var dt=parseDealDate(d.deal_date||d.created_at);return d
 /* ══════════════════════════════════════════════
    INTERNAL FX MATCHING
 ══════════════════════════════════════════════ */
-async function getTodayRate(){
-  try{var t=new Date().toISOString().slice(0,10);var r=await sbGet('ifx_daily_rates','select=*&rate_date=eq.'+t+'&order=created_at.desc&limit=1');return r.length?r[0]:null;}
+async function getTodayRate(pair){
+  try{var t=new Date().toISOString().slice(0,10);var q='select=*&rate_date=eq.'+t+(pair?'&currency_pair=eq.'+encodeURIComponent(pair):'')+'&order=created_at.desc&limit=1';var r=await sbGet('ifx_daily_rates',q);return r.length?r[0]:null;}
   catch(e){return null;}
 }
 async function runAutoMatch(){
   try{
     var reqs=await sbGet('ifx_requests','select=*&status=in.(pending,partial)&order=created_at.asc');
-    var rate=await getTodayRate();if(!rate)return;
     var buys=reqs.filter(function(r){return r.type==='buy'&&r.remaining_amount>0;}).sort(function(a,b){return b.remaining_amount-a.remaining_amount;});
     var sells=reqs.filter(function(r){return r.type==='sell'&&r.remaining_amount>0;}).sort(function(a,b){return b.remaining_amount-a.remaining_amount;});
+    var rateCache={};
     for(var i=0;i<buys.length;i++){for(var j=0;j<sells.length;j++){
       if(buys[i].remaining_amount<=0)break;if(sells[j].remaining_amount<=0)continue;
       if(buys[i].currency_pair!==sells[j].currency_pair)continue;
+      var pr=buys[i].currency_pair;
+      if(!(pr in rateCache))rateCache[pr]=await getTodayRate(pr);
+      var rate=rateCache[pr];if(!rate)continue;
       var ma=Math.min(buys[i].remaining_amount,sells[j].remaining_amount);
       var sv=ma*Math.abs(rate.bank_mid-rate.internal_rate);
-      await sbPost('ifx_matches',{match_no:'MX'+Date.now(),buy_request_id:buys[i].id,sell_request_id:sells[j].id,buy_company:buys[i].company_code,sell_company:sells[j].company_code,buy_group:buys[i].group_name||'',sell_group:sells[j].group_name||'',currency_pair:buys[i].currency_pair,matched_amount:ma,internal_rate:rate.internal_rate,bank_mid:rate.bank_mid,saving_amount:parseFloat(sv.toFixed(2)),status:'pending_settlement',settlement_deadline:new Date(Date.now()+SETTLE_MINS*60000).toISOString(),created_at:new Date().toISOString()});
+      await sbPost('ifx_matches',{match_no:'MX'+Date.now(),buy_request_id:buys[i].id,sell_request_id:sells[j].id,buy_company:buys[i].company_code,sell_company:sells[j].company_code,buy_group:buys[i].group_name||'',sell_group:sells[j].group_name||'',currency_pair:buys[i].currency_pair,matched_amount:ma,internal_rate:rate.internal_rate,bank_mid:rate.bank_mid,saving_amount:parseFloat(sv.toFixed(2)),status:'pending_acceptance',acceptance_deadline:new Date(Date.now()+SETTLE_MINS*60000).toISOString(),created_at:new Date().toISOString()});
       buys[i].remaining_amount-=ma;sells[j].remaining_amount-=ma;
       await sbPatch('ifx_requests','id=eq.'+buys[i].id,{remaining_amount:buys[i].remaining_amount,status:buys[i].remaining_amount<=0?'matched':'partial'});
       await sbPatch('ifx_requests','id=eq.'+sells[j].id,{remaining_amount:sells[j].remaining_amount,status:sells[j].remaining_amount<=0?'matched':'partial'});
@@ -680,24 +692,42 @@ async function pgMatch(){
   try{
     var[reqs,matches,rate]=await Promise.all([sbGet('ifx_requests','select=*&order=created_at.desc'),sbGet('ifx_matches','select=*&order=created_at.desc&limit=80'),getTodayRate()]);
     var pend=reqs.filter(function(r){return r.status==='pending'||r.status==='partial';});
+    var pendAccept=matches.filter(function(x){return x.status==='pending_acceptance';});
     var isA=CU.role==='admin'||CU.role==='super_admin';
+    /* Currency filter tabs */
+    var curFilter=window._matchCurFilter||'all';
+    var pendFiltered=curFilter==='all'?pend:pend.filter(function(r){return (r.currency_pair||'').includes(curFilter);});
     m.innerHTML='<div class="fadein">'+
-      '<div class="page-hdr"><div><div class="page-title">Live Matching</div><div class="page-sub">Real-time buy/sell netting · open positions</div></div>'+
+      '<div class="page-hdr"><div><div class="page-title">Live Matching</div><div class="page-sub">Real-time buy/sell netting · USD, EUR, ZAR</div></div>'+
         (isA?'<button class="btn btn-success btn-sm" onclick="runMatch(this)">▶ Run Auto-Match</button>':'')+
       '</div>'+
       (!rate?'<div class="alert warn">⚠ No rate set today — admin must set rate before matching.</div>':'')+
+      (pendAccept.length?'<div class="alert warn">⚠ '+pendAccept.length+' match(es) awaiting seller acceptance. <button class="btn btn-ghost btn-sm" style="margin-left:6px" onclick="nav(\'settlements\')">View → Settlements</button></div>':'')+
+      '<div class="fstrip">'+
+        '<div class="ftabs">'+
+          '<button class="ftab'+(curFilter==='all'?' active':'')+'" onclick="window._matchCurFilter=\'all\';nav(\'matching\')">All</button>'+
+          '<button class="ftab'+(curFilter==='EUR'?' active':'')+'" onclick="window._matchCurFilter=\'EUR\';nav(\'matching\')">EUR</button>'+
+          '<button class="ftab'+(curFilter==='USD'?' active':'')+'" onclick="window._matchCurFilter=\'USD\';nav(\'matching\')">USD</button>'+
+          '<button class="ftab'+(curFilter==='ZAR'?' active':'')+'" onclick="window._matchCurFilter=\'ZAR\';nav(\'matching\')">ZAR</button>'+
+        '</div>'+
+      '</div>'+
       '<div class="card" style="margin-bottom:12px">'+
-        '<div class="card-hdr"><div class="card-title">Open Positions</div><span style="font-size:11px;color:var(--text3)">'+pend.length+' requests</span></div>'+
-        (pend.length?'<div class="tbl-w"><table><thead><tr><th>Req No.</th><th>Co.</th><th>Group</th><th>Type</th><th>Pair</th><th class="r">Original</th><th class="r">Remaining</th><th>Status</th><th>Age</th></tr></thead><tbody>'+
-          pend.map(function(r){return '<tr><td class="dim mono" style="font-size:11px">'+r.request_no+'</td><td style="font-weight:700">'+r.company_code+'</td><td class="dim">'+( r.group_name||'—')+'</td><td>'+badge(r.type,r.type.toUpperCase())+'</td><td class="dim">'+r.currency_pair+'</td><td class="r">'+fN(r.amount)+'</td><td class="r" style="font-weight:700;color:var(--accent)">'+fN(r.remaining_amount)+'</td><td>'+badge(r.status,r.status)+'</td><td class="dim">'+ago(r.created_at)+'</td></tr>';}).join('')+
+        '<div class="card-hdr"><div class="card-title">Open Positions</div><span style="font-size:11px;color:var(--text3)">'+pendFiltered.length+' requests</span></div>'+
+        (pendFiltered.length?'<div class="tbl-w"><table><thead><tr><th>Req No.</th><th>Co.</th><th>Group</th><th>Type</th><th>Pair</th><th class="r">Original</th><th class="r">Remaining</th><th>Status</th><th>Age</th></tr></thead><tbody>'+
+          pendFiltered.map(function(r){return '<tr><td class="dim mono" style="font-size:11px">'+r.request_no+'</td><td style="font-weight:700">'+r.company_code+'</td><td class="dim">'+( r.group_name||'—')+'</td><td>'+badge(r.type,r.type.toUpperCase())+'</td><td class="dim">'+r.currency_pair+'</td><td class="r">'+fN(r.amount)+'</td><td class="r" style="font-weight:700;color:var(--accent)">'+fN(r.remaining_amount)+'</td><td>'+badge(r.status,r.status)+'</td><td class="dim">'+ago(r.created_at)+'</td></tr>';}).join('')+
         '</tbody></table></div>':'<div class="empty"><div class="empty-icon">✅</div><div class="empty-title">All matched!</div></div>')+
       '</div>'+
       '<div class="card">'+
         '<div class="card-hdr"><div class="card-title">Recent Matches</div></div>'+
         (matches.length?'<div class="tbl-w"><table><thead><tr><th>Match No.</th><th>Buyer</th><th>Seller</th><th>Pair</th><th class="r">Amount</th><th class="r">Rate</th><th class="r">Saving</th><th>Status</th><th>Deadline</th></tr></thead><tbody>'+
-          matches.map(function(x){return '<tr><td class="dim mono" style="font-size:11px">'+x.match_no+'</td><td>'+badge('buy',x.buy_company)+'</td><td>'+badge('sell',x.sell_company)+'</td><td class="dim">'+x.currency_pair+'</td><td class="r">'+fN(x.matched_amount)+'</td><td class="r mono">'+x.internal_rate.toFixed(5)+'</td><td class="r" style="color:var(--green);font-weight:600">'+fN(Math.round(x.saving_amount))+'</td><td>'+badge(x.status==='settled'?'matched':'pending',x.status)+'</td><td>'+
-            (x.status==='pending_settlement'?'<span class="cdown '+cdCls(x.settlement_deadline)+'" id="cd_'+x.id+'" data-dl="'+x.settlement_deadline+'">'+cdFmt(x.settlement_deadline)+'</span>':'<span class="dim" style="font-size:11px">'+fT(x.settled_at)+'</span>')+
-          '</td></tr>';}).join('')+
+          matches.map(function(x){
+            var statusLbl=x.status==='pending_acceptance'?'Awaiting Seller':x.status==='settled'?'Settled':x.status==='rejected'?'Rejected → Bank':x.status;
+            var statusCls=x.status==='pending_acceptance'?'warn':x.status==='settled'?'matched':x.status==='rejected'?'expired':'pending';
+            var dl=x.status==='pending_acceptance'?x.acceptance_deadline:x.settlement_deadline;
+            return '<tr><td class="dim mono" style="font-size:11px">'+x.match_no+'</td><td>'+badge('buy',x.buy_company)+'</td><td>'+badge('sell',x.sell_company)+'</td><td class="dim">'+x.currency_pair+'</td><td class="r">'+fN(x.matched_amount)+'</td><td class="r mono">'+(x.internal_rate?x.internal_rate.toFixed(5):'—')+'</td><td class="r" style="color:var(--green);font-weight:600">'+fN(Math.round(x.saving_amount))+'</td><td>'+badge(statusCls,statusLbl)+'</td><td>'+
+              ((x.status==='pending_settlement'||x.status==='pending_acceptance')&&dl?'<span class="cdown '+cdCls(dl)+'" id="cd_'+x.id+'" data-dl="'+dl+'">'+cdFmt(dl)+'</span>':'<span class="dim" style="font-size:11px">'+fT(x.settled_at)+'</span>')+
+            '</td></tr>';
+          }).join('')+
         '</tbody></table></div>':'<div class="empty"><div class="empty-title">No matches yet</div></div>')+
       '</div></div>';
     startCdowns();
@@ -710,13 +740,46 @@ async function pgSettle(){
   var m=document.getElementById('mainArea');
   try{
     var matches=await sbGet('ifx_matches','select=*&order=created_at.desc');
+    var pendAccept=matches.filter(function(x){return x.status==='pending_acceptance';});
     var pend=matches.filter(function(x){return x.status==='pending_settlement';});
+    var rejected=matches.filter(function(x){return x.status==='rejected';});
     var done=matches.filter(function(x){return x.status==='settled';});
     var tod=new Date().toISOString().slice(0,10);
     m.innerHTML='<div class="fadein">'+
-      '<div class="page-hdr"><div><div class="page-title">Settlements</div><div class="page-sub">Track and complete matched deal settlements</div></div></div>'+
-      '<div class="grid-3">'+kpi('Pending',pend.length,'awaiting settlement','amber')+kpi('Settled Today',done.filter(function(x){return x.settled_at&&x.settled_at.slice(0,10)===tod;}).length,'today','green')+kpi('Time Limit',SETTLE_MINS+' min','per match','blue')+'</div>'+
-      (pend.length?'<div class="card" style="margin-bottom:12px"><div class="card-hdr"><div class="card-title">⏱ Pending Settlement</div></div>'+renderSettleTbl(pend,true)+'</div>':'<div class="alert success">✅ All pending matches have been settled.</div>')+
+      '<div class="page-hdr"><div><div class="page-title">Settlements</div><div class="page-sub">Seller acceptance · deal settlement · trade workflow</div></div></div>'+
+      '<div class="grid-4">'+
+        kpi('Awaiting Acceptance',pendAccept.length,'seller must accept','amber')+
+        kpi('Pending Settlement',pend.length,'accepted · awaiting settlement','blue')+
+        kpi('Settled Today',done.filter(function(x){return x.settled_at&&x.settled_at.slice(0,10)===tod;}).length,'today','green')+
+        kpi('Rejected → Bank',rejected.length,'moved to bank execution','red')+
+      '</div>'+
+      (pendAccept.length?
+        '<div class="card" style="margin-bottom:12px;border-color:var(--amber-bd)">'+
+          '<div class="card-hdr"><div class="card-title" style="color:var(--amber)">⏳ Awaiting Seller Acceptance</div>'+
+          '<span style="font-size:11px;color:var(--text3)">Seller must accept within '+SETTLE_MINS+' min</span></div>'+
+          '<div class="alert warn" style="margin-bottom:10px">These matches are awaiting seller confirmation. If rejected or expired, the buy request moves to bank (Buy Exposure).</div>'+
+          '<div class="tbl-w"><table><thead><tr><th>Match No.</th><th>Buyer</th><th>Seller</th><th>Pair</th><th class="r">Amount</th><th class="r">Saving</th><th>Deadline</th><th></th></tr></thead><tbody>'+
+          pendAccept.map(function(x){
+            var isSeller=CU.company_code===x.sell_company||CU.role==='admin'||CU.role==='super_admin';
+            return '<tr>'+
+              '<td class="dim mono" style="font-size:11px">'+x.match_no+'</td>'+
+              '<td>'+badge('buy',x.buy_company)+'</td>'+
+              '<td>'+badge('sell',x.sell_company)+'</td>'+
+              '<td class="dim">'+x.currency_pair+'</td>'+
+              '<td class="r">'+fN(x.matched_amount)+'</td>'+
+              '<td class="r" style="color:var(--green);font-weight:600">'+fN(Math.round(x.saving_amount))+'</td>'+
+              '<td><span class="cdown '+cdCls(x.acceptance_deadline)+'" id="cd_'+x.id+'" data-dl="'+x.acceptance_deadline+'">'+cdFmt(x.acceptance_deadline)+'</span></td>'+
+              '<td style="white-space:nowrap">'+(isSeller?'<button class="btn btn-success btn-sm" style="margin-right:4px" onclick="acceptMatch(\''+x.id+'\')">Accept</button><button class="btn btn-danger btn-sm" onclick="rejectMatch(\''+x.id+'\','+x.buy_request_id+','+x.sell_request_id+','+x.matched_amount+')">Reject</button>':'<span class="dim" style="font-size:11px">Waiting for seller</span>')+'</td>'+
+            '</tr>';
+          }).join('')+
+          '</tbody></table></div></div>':'') +
+      (pend.length?'<div class="card" style="margin-bottom:12px"><div class="card-hdr"><div class="card-title">⏱ Accepted — Pending Settlement</div></div>'+renderSettleTbl(pend,true)+'</div>':'') +
+      (!pendAccept.length&&!pend.length?'<div class="alert success" style="margin-bottom:12px">✅ No pending actions — all matches processed.</div>':'')+
+      (rejected.length?
+        '<div class="card" style="margin-bottom:12px"><div class="card-hdr"><div class="card-title" style="color:var(--red)">✗ Rejected → Bank Exposure</div></div>'+
+          '<div class="tbl-w"><table><thead><tr><th>Match No.</th><th>Buyer</th><th>Seller</th><th>Pair</th><th class="r">Amount</th><th>Rejected At</th></tr></thead><tbody>'+
+          rejected.map(function(x){return '<tr><td class="dim mono" style="font-size:11px">'+x.match_no+'</td><td>'+badge('buy',x.buy_company)+'</td><td>'+badge('sell',x.sell_company)+'</td><td class="dim">'+x.currency_pair+'</td><td class="r">'+fN(x.matched_amount)+'</td><td class="dim">'+fT(x.settled_at||x.created_at)+'</td></tr>';}).join('')+
+          '</tbody></table></div></div>':'')+
       '<div class="card"><div class="card-hdr"><div class="card-title">✅ Settled</div><span style="font-size:11px;color:var(--text3)">'+done.length+' total</span></div>'+
       (done.length?'<div class="tbl-w"><table><thead><tr><th>Match No.</th><th>Buyer</th><th>Seller</th><th class="r">Amount</th><th class="r">Saving</th><th>Settled At</th><th>Notes</th></tr></thead><tbody>'+
         done.map(function(x){return '<tr><td class="dim mono" style="font-size:11px">'+x.match_no+'</td><td>'+x.buy_company+'</td><td>'+x.sell_company+'</td><td class="r">'+fN(x.matched_amount)+'</td><td class="r" style="color:var(--green);font-weight:600">'+fN(Math.round(x.saving_amount))+'</td><td class="dim">'+fT(x.settled_at)+'</td><td class="dim" style="font-style:italic">'+(x.settlement_notes||'—')+'</td></tr>';}).join('')+
@@ -729,6 +792,23 @@ function renderSettleTbl(matches,showBtn){
   return '<div class="tbl-w"><table><thead><tr><th>Match</th><th>Buyer</th><th>Seller</th><th>Pair</th><th class="r">Amount</th><th class="r">Saving</th><th>Deadline</th>'+(showBtn?'<th></th>':'')+'</tr></thead><tbody>'+
     matches.map(function(x){return '<tr><td class="dim mono" style="font-size:11px">'+x.match_no+'</td><td>'+badge('buy',x.buy_company)+'</td><td>'+badge('sell',x.sell_company)+'</td><td class="dim">'+x.currency_pair+'</td><td class="r">'+fN(x.matched_amount)+'</td><td class="r" style="color:var(--green);font-weight:600">'+fN(Math.round(x.saving_amount))+'</td><td><span class="cdown '+cdCls(x.settlement_deadline)+'" id="cd_'+x.id+'" data-dl="'+x.settlement_deadline+'">'+cdFmt(x.settlement_deadline)+'</span></td>'+(showBtn?'<td><button class="settle-btn" onclick="openSettle(\''+x.id+'\',\''+x.match_no+'\','+x.matched_amount+',\''+x.currency_pair+'\')">Settle</button></td>':'')+'</tr>';}).join('')+
   '</tbody></table></div>';
+}
+async function acceptMatch(id){
+  try{
+    await sbPatch('ifx_matches','id=eq.'+id,{status:'pending_settlement',settlement_deadline:new Date(Date.now()+SETTLE_MINS*60000).toISOString()});
+    await logAudit('MATCH_ACCEPTED','match',id,'Seller accepted — moved to pending settlement');
+    nav('settlements');
+  }catch(e){alert('Error: '+e.message);}
+}
+async function rejectMatch(id,buyReqId,sellReqId,amount){
+  if(!confirm('Reject this match? The buy request will move to Bank Exposure.'))return;
+  try{
+    await sbPatch('ifx_matches','id=eq.'+id,{status:'rejected',settled_at:new Date().toISOString()});
+    if(buyReqId)await sbPatch('ifx_requests','id=eq.'+buyReqId,{remaining_amount:amount,status:'pending'});
+    if(sellReqId)await sbPatch('ifx_requests','id=eq.'+sellReqId,{remaining_amount:amount,status:'pending'});
+    await logAudit('MATCH_REJECTED','match',id,'Seller rejected — buy request moved to bank exposure');
+    nav('settlements');
+  }catch(e){alert('Error: '+e.message);}
 }
 function openSettle(id,no,amt,pair){settleId=id;document.getElementById('settleDetails').innerHTML='<div class="alert info"><b>'+no+'</b> · '+fN(amt)+' '+pair+'</div>';document.getElementById('settleNotes').value='';document.getElementById('settleModal').classList.add('open');}
 async function confirmSettle(){if(!settleId)return;try{await sbPatch('ifx_matches','id=eq.'+settleId,{status:'settled',settled_at:new Date().toISOString(),settlement_notes:document.getElementById('settleNotes').value});await logAudit('SETTLE','match',settleId,'Settled');closeModal('settleModal');nav('settlements');}catch(e){alert('Error: '+e.message);}}
@@ -744,11 +824,12 @@ async function pgSubmit(){
       (!rate?'<div class="alert warn">⚠ No rate today. Contact treasury admin.</div>':'')+
       '<div class="grid-2">'+
       '<div class="card"><div class="card-hdr"><div class="card-title">Request Details</div></div><div id="subMsg"></div>'+
-        '<div class="fg"><label class="flbl">Company</label><select class="fsel" id="rqCo" onchange="filterGrps()"><option value="">— Select —</option>'+COS.map(function(c){return '<option value="'+c.id+'">'+c.n+'</option>';}).join('')+'</select></div>'+
-        '<div class="fg"><label class="flbl">Group</label><select class="fsel" id="rqGrp"><option value="">— Select company first —</option></select></div>'+
-        '<div class="fg"><label class="flbl">Transaction Type</label><select class="fsel" id="rqType"><option value="buy">BUY EUR — need foreign currency</option><option value="sell">SELL EUR — have foreign currency</option></select></div>'+
-        '<div class="fg"><label class="flbl">Currency Pair</label><select class="fsel" id="rqPair"><option value="EUR/USD">EUR / USD</option><option value="USD/ZAR">USD / ZAR</option></select></div>'+
-        '<div class="fg"><label class="flbl">Amount (EUR)</label><input class="fi" type="number" id="rqAmt" placeholder="e.g. 500,000" min="1000"></div>'+
+        '<div class="fg"><label class="flbl">Company</label><select class="fsel" id="rqCo" onchange="filterAccounts()"><option value="">— Select —</option>'+COS.map(function(c){return '<option value="'+c.id+'">'+c.n+' ('+c.short+')</option>';}).join('')+'</select></div>'+
+        '<div class="fg"><label class="flbl">Account Number</label><select class="fsel" id="rqAcct" onchange="fillGroupFromAccount()"><option value="">— Select company first —</option></select></div>'+
+        '<div class="fg"><label class="flbl">Group</label><input class="fi" id="rqGrp" readonly placeholder="Auto-filled from account selection" style="background:var(--surface2);color:var(--text3)"></div>'+
+        '<div class="fg"><label class="flbl">IBAN</label><input class="fi" id="rqIban" readonly placeholder="Auto-filled" style="background:var(--surface2);color:var(--text3);font-size:12px"></div>'+
+        '<div class="fg"><label class="flbl">Transaction Type</label><select class="fsel" id="rqType"><option value="buy|EUR/USD">Buy EUR — get Euros, pay USD</option><option value="sell|EUR/USD">Sell EUR — give Euros, get USD</option><option value="buy|USD/ZAR">Buy USD — get Dollars, pay ZAR</option><option value="sell|USD/ZAR">Sell USD — give Dollars, get ZAR</option><option value="buy|ZAR/USD">Buy ZAR — get Rands, pay USD</option><option value="sell|ZAR/USD">Sell ZAR — give Rands, get USD</option></select></div>'+
+        '<div class="fg"><label class="flbl">Amount</label><input class="fi" type="number" id="rqAmt" placeholder="e.g. 500,000" min="1000"></div>'+
         '<div class="fg"><label class="flbl">Remarks</label><input class="fi" type="text" id="rqRem" placeholder="Optional notes"></div>'+
         '<button class="btn btn-primary btn-full" onclick="submitReq()">Submit Request</button>'+
       '</div>'+
@@ -762,18 +843,19 @@ async function pgSubmit(){
           '<div style="font-size:12px;color:var(--text2);line-height:2">1. Submit buy or sell requirement<br>2. System auto-matches opposite requests<br>3. Settle matched deals within '+SETTLE_MINS+' minutes<br>4. Unmatched remainder → bank settlement<br>5. Savings = bank spread on matched volume</div>'+
         '</div>'+
       '</div></div></div>';
-    if(CU&&CU.company_code){var el=document.getElementById('rqCo');if(el){el.value=CU.company_code;filterGrps();}}
+    if(CU&&CU.company_code){var el=document.getElementById('rqCo');if(el){el.value=CU.company_code;filterAccounts();setTimeout(function(){var acct=document.getElementById('rqAcct');if(acct&&acct.options.length===2){acct.selectedIndex=1;fillGroupFromAccount();}},0);}}
   }catch(e){document.getElementById('mainArea').innerHTML='<div class="alert danger">'+e.message+'</div>';}
 }
-function filterGrps(){var co=document.getElementById('rqCo').value,s=document.getElementById('rqGrp');s.innerHTML='<option value="">— Select group —</option>';(window._allGrps||[]).filter(function(g){return g.company_code===co;}).forEach(function(g){var o=document.createElement('option');o.value=g.id;o.textContent=g.name;s.appendChild(o);});}
+function filterAccounts(){var co=document.getElementById('rqCo').value,s=document.getElementById('rqAcct');s.innerHTML='<option value="">— Select account —</option>';document.getElementById('rqGrp').value='';document.getElementById('rqIban').value='';(window._allGrps||[]).filter(function(g){return g.company_code===co;}).forEach(function(g){var o=document.createElement('option');o.value=g.id;o.textContent=(g.bank_account||'No account')+' — '+g.name;s.appendChild(o);});}
+function fillGroupFromAccount(){var id=document.getElementById('rqAcct').value;var grp=(window._allGrps||[]).find(function(g){return String(g.id)===String(id);});document.getElementById('rqGrp').value=grp?grp.name:'';document.getElementById('rqIban').value=grp?grp.iban||'':'';}
 async function submitReq(){
-  var co=document.getElementById('rqCo').value,gid=document.getElementById('rqGrp').value,tp=document.getElementById('rqType').value,pr=document.getElementById('rqPair').value,am=parseFloat(document.getElementById('rqAmt').value),rm=document.getElementById('rqRem').value,msg=document.getElementById('subMsg');
-  if(!co||!gid||!am||am<1000){msg.innerHTML='<div class="err-msg">Fill all required fields. Minimum 1,000.</div>';return;}
-  var rate=await getTodayRate();if(!rate){msg.innerHTML='<div class="err-msg">No rate set today.</div>';return;}
+  var co=document.getElementById('rqCo').value,aid=document.getElementById('rqAcct').value,sel=document.getElementById('rqType').value.split('|'),tp=sel[0]||'buy',pr=sel[1]||'EUR/USD',am=parseFloat(document.getElementById('rqAmt').value),rm=document.getElementById('rqRem').value,msg=document.getElementById('subMsg');
+  if(!co||!aid||!am||am<1000){msg.innerHTML='<div class="err-msg">Fill all required fields. Minimum 1,000.</div>';return;}
+  var rate=await getTodayRate(pr);if(!rate){msg.innerHTML='<div class="err-msg">No rate set today for '+pr+'. Admin must set rate first.</div>';return;}
   try{
-    var grp=(window._allGrps||[]).find(function(g){return String(g.id)===String(gid);});
+    var grp=(window._allGrps||[]).find(function(g){return String(g.id)===String(aid);});
     var rno='RQ'+Date.now();
-    await sbPost('ifx_requests',{request_no:rno,user_id:CU.id,user_name:CU.name,company_code:co,group_id:gid,group_name:grp?grp.name:'',type:tp,currency_pair:pr,amount:am,remaining_amount:am,rate_at_request:rate.internal_rate,status:'pending',remarks:rm,created_at:new Date().toISOString()});
+    await sbPost('ifx_requests',{request_no:rno,user_id:CU.id,user_name:CU.name,company_code:co,group_id:aid,group_name:grp?grp.name:'',type:tp,currency_pair:pr,amount:am,remaining_amount:am,rate_at_request:rate.internal_rate,status:'pending',remarks:rm,created_at:new Date().toISOString()});
     await logAudit('REQUEST',rno,rno,tp+' '+fN(am)+' '+pr);
     msg.innerHTML='<div class="ok-msg">✅ '+rno+' submitted. Running match engine...</div>';
     await runAutoMatch();
@@ -1002,7 +1084,7 @@ async function pgDealDash(){
     await new Promise(function(res,rej){var s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js';s.onload=res;s.onerror=function(){rej(Error('Chart.js load failed'));};document.head.appendChild(s);});
   }
   var all=[];
-  try{all=await sbGet('fx_deals','select=*&order=created_at.asc');}catch(e){m.innerHTML='<div class="alert danger">Error loading deals: '+e.message+'</div>';return;}
+  try{all=await sbGet('fx_deals','select=*&order=created_at.asc');}catch(e){m.innerHTML='<div class="alert danger">Error loading dashboard: '+e.message+'</div>';return;}
   window._allDeals=all;
   if(!all.length){m.innerHTML='<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">No deals yet</div><div class="empty-sub">Confirm your first deal in Deal Entry</div></div>';return;}
   renderFullDash(all);
@@ -1324,34 +1406,45 @@ async function pgRate(){
   var m=document.getElementById('mainArea');
   try{
     var tod=new Date().toISOString().slice(0,10);
-    var hist=await sbGet('ifx_daily_rates','select=*&order=rate_date.desc&limit=14');
-    var tr=hist.find(function(r){return r.rate_date===tod;});
+    var hist=await sbGet('ifx_daily_rates','select=*&order=rate_date.desc&limit=21');
+    var pairs=Object.keys(FX_CFG);
+    window._pgRateToday={};
+    pairs.forEach(function(p){var r=hist.find(function(x){return x.rate_date===tod&&x.currency_pair===p;});if(r)window._pgRateToday[p]=r;});
+    var firstRate=window._pgRateToday[pairs[0]]||null;
     m.innerHTML='<div class="fadein">'+
       '<div class="page-hdr"><div><div class="page-title">Daily Rate Management</div></div></div>'+
-      (tr?'<div class="alert success">✅ Today\'s rate: <b>'+tr.internal_rate.toFixed(5)+'</b> &nbsp;·&nbsp; Bank mid: '+tr.bank_mid.toFixed(5)+' &nbsp;·&nbsp; Set by '+tr.set_by+'</div>':'<div class="alert warn">⚠ No rate set for today.</div>')+
+      pairs.map(function(p){var r=window._pgRateToday[p];return r?'<div class="alert success" style="margin-bottom:6px">✅ <b>'+p+'</b>: Internal <b>'+r.internal_rate.toFixed(5)+'</b> · Bank mid '+r.bank_mid.toFixed(5)+' · Set by '+r.set_by+'</div>':'<div class="alert warn" style="margin-bottom:6px">⚠ No rate set today for <b>'+p+'</b>.</div>';}).join('')+
       '<div class="grid-2">'+
       '<div class="card"><div class="card-hdr"><div class="card-title">Set Today\'s Rate</div></div><div id="rateMsg"></div>'+
-        '<div class="fg"><label class="flbl">Internal Rate (EUR/USD)</label><input class="fi" type="number" id="rIn" step="0.00001" placeholder="e.g. 1.17250" value="'+(tr?tr.internal_rate:'')+'"></div>'+
-        '<div class="fg"><label class="flbl">Bank Mid Reference (EUR/USD)</label><input class="fi" type="number" id="rMid" step="0.00001" placeholder="e.g. 1.17300" value="'+(tr?tr.bank_mid:'')+'"></div>'+
+        '<div class="fg"><label class="flbl">Currency Pair</label><select class="fsel" id="rPair" onchange="prefillRate()">'+pairs.map(function(p){return '<option value="'+p+'">'+FX_CFG[p].label+'</option>';}).join('')+'</select></div>'+
+        '<div class="fg"><label class="flbl">Internal Rate</label><input class="fi" type="number" id="rIn" step="0.00001" placeholder="e.g. 1.17250" value="'+(firstRate?firstRate.internal_rate:'')+'"></div>'+
+        '<div class="fg"><label class="flbl">Bank Mid Reference</label><input class="fi" type="number" id="rMid" step="0.00001" placeholder="e.g. 1.17300" value="'+(firstRate?firstRate.bank_mid:'')+'"></div>'+
         '<div class="fg"><label class="flbl">Settlement Time Limit (minutes)</label><input class="fi" type="number" id="rSettle" value="'+SETTLE_MINS+'" min="15"></div>'+
-        '<div class="alert info" style="font-size:12px">Requires admin password confirmation.</div>'+
+        '<div class="alert info" style="font-size:12px">Requires admin password confirmation. Rate applies to the selected currency pair.</div>'+
         '<button class="btn btn-primary btn-full" onclick="setRate()">🔒 Set Rate</button>'+
       '</div>'+
       '<div class="card"><div class="card-hdr"><div class="card-title">Rate History</div></div>'+
-        (hist.length?'<table><thead><tr><th>Date</th><th class="r">Internal</th><th class="r">Bank Mid</th><th class="r">Pip Save</th><th>Set By</th></tr></thead><tbody>'+
-          hist.map(function(r){return '<tr><td class="dim">'+r.rate_date+'</td><td class="r mono" style="font-weight:600">'+r.internal_rate.toFixed(5)+'</td><td class="r mono">'+r.bank_mid.toFixed(5)+'</td><td class="r" style="color:var(--green);font-weight:700">'+(Math.abs(r.bank_mid-r.internal_rate)*10000).toFixed(1)+'</td><td class="dim">'+r.set_by+'</td></tr>';}).join('')+'</tbody></table>':'<div class="empty"><div class="empty-title">No history</div></div>')+
+        (hist.length?'<table><thead><tr><th>Date</th><th>Pair</th><th class="r">Internal</th><th class="r">Bank Mid</th><th class="r">Pip Save</th><th>Set By</th></tr></thead><tbody>'+
+          hist.map(function(r){var pr=r.currency_pair||'EUR/USD';var cfg=FX_CFG[pr]||FX_CFG['EUR/USD'];return '<tr><td class="dim">'+r.rate_date+'</td><td class="mono" style="font-size:11px;color:var(--text2)">'+pr+'</td><td class="r mono" style="font-weight:600">'+r.internal_rate.toFixed(5)+'</td><td class="r mono">'+r.bank_mid.toFixed(5)+'</td><td class="r" style="color:var(--green);font-weight:700">'+(Math.abs(r.bank_mid-r.internal_rate)*cfg.pm).toFixed(1)+'</td><td class="dim">'+r.set_by+'</td></tr>';}).join('')+'</tbody></table>':'<div class="empty"><div class="empty-title">No history</div></div>')+
       '</div></div></div>';
   }catch(e){document.getElementById('mainArea').innerHTML='<div class="alert danger">'+e.message+'</div>';}
 }
+function prefillRate(){
+  var p=document.getElementById('rPair')?document.getElementById('rPair').value:'EUR/USD';
+  var r=(window._pgRateToday||{})[p];
+  var el=document.getElementById('rIn');if(el)el.value=r?r.internal_rate:'';
+  el=document.getElementById('rMid');if(el)el.value=r?r.bank_mid:'';
+}
 function setRate(){requirePwd(async function(){
+  var pair=document.getElementById('rPair').value,cfg=FX_CFG[pair]||FX_CFG['EUR/USD'];
   var ir=parseFloat(document.getElementById('rIn').value),bm=parseFloat(document.getElementById('rMid').value),sl=parseInt(document.getElementById('rSettle').value)||60;
   var msg=document.getElementById('rateMsg');
-  if(!ir||!bm||ir<.5||ir>3){msg.innerHTML='<div class="err-msg">Enter valid EUR/USD rates (.5 – 3).</div>';return;}
+  if(!ir||!bm||ir<cfg.mn||ir>cfg.mx){msg.innerHTML='<div class="err-msg">Enter valid '+pair+' rate ('+cfg.mn+' – '+cfg.mx+').</div>';return;}
   try{
     SETTLE_MINS=sl;var t=new Date().toISOString().slice(0,10);
-    await sbUpsert('ifx_daily_rates',{rate_date:t,internal_rate:ir,bank_mid:bm,set_by:CU.name,created_at:new Date().toISOString()},'rate_date');
-    await logAudit('RATE_SET','rate',t,'Internal:'+ir+' Mid:'+bm);
-    msg.innerHTML='<div class="ok-msg">✅ Rate set for '+t+'</div>';
+    await sbUpsert('ifx_daily_rates',{rate_date:t,currency_pair:pair,internal_rate:ir,bank_mid:bm,set_by:CU.name,created_at:new Date().toISOString()},'rate_date,currency_pair');
+    await logAudit('RATE_SET','rate',t,pair+' Internal:'+ir+' Mid:'+bm);
+    msg.innerHTML='<div class="ok-msg">✅ '+pair+' rate set for '+t+'</div>';
     setTimeout(pgRate,1800);
   }catch(e){msg.innerHTML='<div class="err-msg">'+e.message+'</div>';}
 });}
@@ -1370,20 +1463,21 @@ async function pgUsers(){
           '<div class="fg"><label class="flbl">Email</label><input class="fi" type="email" id="uEmail" placeholder="email@grfholdings.com"></div>'+
           '<div class="fg"><label class="flbl">Role</label><select class="fsel" id="uRole"><option value="user">User</option><option value="fx_trader">FX Trader</option><option value="admin">Admin</option><option value="super_admin">Super Admin</option></select></div>'+
           '<div class="fg"><label class="flbl">Company</label><select class="fsel" id="uCo"><option value="">— Any —</option>'+COS.map(function(c){return '<option value="'+c.id+'">'+c.n+'</option>';}).join('')+'</select></div>'+
+          '<div class="fg"><label class="flbl">FX Deal Page Access</label><select class="fsel" id="uFxAccess"><option value="false">No Access</option><option value="true">Can View FX Deal Page</option></select></div>'+
           '<div class="fg"><label class="flbl">6-Digit PIN</label><input class="fi" type="text" id="uPin" placeholder="e.g. 123456" maxlength="6"></div>'+
         '</div>'+
         '<button class="btn btn-success" onclick="createUser()">Create User</button>'+
       '</div>'+
-      '<div class="card"><div class="tbl-w"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Company</th><th>Status</th><th>Created</th><th></th></tr></thead><tbody>'+
-        users.map(function(u){return '<tr><td style="font-weight:600">'+u.name+'</td><td class="dim">'+u.email+'</td><td>'+badge(u.role,u.role.replace(/_/g,' '))+'</td><td>'+(u.company_code||'—')+'</td><td>'+badge(u.active?'active':'inactive',u.active?'Active':'Inactive')+'</td><td class="dim">'+fD(u.created_at)+'</td><td><button class="btn btn-ghost btn-sm" onclick="toggleUser('+u.id+','+u.active+')">'+(u.active?'Deactivate':'Activate')+'</button></td></tr>';}).join('')+
+      '<div class="card"><div class="tbl-w"><table><thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Company</th><th>FX Access</th><th>Status</th><th>Created</th><th></th></tr></thead><tbody>'+
+        users.map(function(u){return '<tr><td style="font-weight:600">'+u.name+'</td><td class="dim">'+u.email+'</td><td>'+badge(u.role,u.role.replace(/_/g,' '))+'</td><td>'+(u.company_code||'—')+'</td><td>'+(u.can_view_fx_deal_page?'Yes':'No')+'</td><td>'+badge(u.active?'active':'inactive',u.active?'Active':'Inactive')+'</td><td class="dim">'+fD(u.created_at)+'</td><td><button class="btn btn-ghost btn-sm" onclick="toggleUser('+u.id+','+u.active+')">'+(u.active?'Deactivate':'Activate')+'</button></td></tr>';}).join('')+
       '</tbody></table></div></div></div>';
   }catch(e){document.getElementById('mainArea').innerHTML='<div class="alert danger">'+e.message+'</div>';}
 }
 function showAddUser(){document.getElementById('addUserF').style.display='block';window.scrollTo({top:0,behavior:'smooth'});}
 async function createUser(){
-  var n=document.getElementById('uName').value.trim(),e=document.getElementById('uEmail').value.trim().toLowerCase(),r=document.getElementById('uRole').value,co=document.getElementById('uCo').value,p=document.getElementById('uPin').value.trim(),msg=document.getElementById('userMsg');
+  var n=document.getElementById('uName').value.trim(),e=document.getElementById('uEmail').value.trim().toLowerCase(),r=document.getElementById('uRole').value,co=document.getElementById('uCo').value,fxAccess=document.getElementById('uFxAccess').value==='true',p=document.getElementById('uPin').value.trim(),msg=document.getElementById('userMsg');
   if(!n||!e||!p||p.length!==6||!/^\d+$/.test(p)){msg.innerHTML='<div class="err-msg">All fields required. PIN must be exactly 6 digits.</div>';return;}
-  try{await sbPost('ifx_users',{name:n,email:e,role:r,company_code:co,pin:p,active:true,created_at:new Date().toISOString()});await logAudit('USER_CREATED','user',e,'Created as '+r);msg.innerHTML='<div class="ok-msg">✅ User created. PIN: <b>'+p+'</b></div>';setTimeout(pgUsers,2200);}catch(e){msg.innerHTML='<div class="err-msg">'+e.message+'</div>';}
+  try{await sbPost('ifx_users',{name:n,email:e,role:r,company_code:co,can_view_fx_deal_page:fxAccess,pin:p,active:true,created_at:new Date().toISOString()});await logAudit('USER_CREATED','user',e,'Created as '+r);msg.innerHTML='<div class="ok-msg">✅ User created. PIN: <b>'+p+'</b></div>';setTimeout(pgUsers,2200);}catch(e){msg.innerHTML='<div class="err-msg">'+e.message+'</div>';}
 }
 async function toggleUser(id,active){await sbPatch('ifx_users','id=eq.'+id,{active:!active});pgUsers();}
 
@@ -1428,6 +1522,97 @@ async function pgAudit(){
   }catch(e){document.getElementById('mainArea').innerHTML='<div class="alert danger">'+e.message+'</div>';}
 }
 
+/* ══ SAVINGS DASHBOARD ══ */
+async function pgSavings(){
+  var m=document.getElementById('mainArea');
+  try{
+    var matches=await sbGet('ifx_matches','select=*&order=created_at.asc');
+    var settled=matches.filter(function(x){return x.status==='settled'||x.status==='pending_settlement';});
+    var now=new Date();
+    var todayStr=now.toISOString().slice(0,10);
+    var weekAgo=new Date(now);weekAgo.setDate(weekAgo.getDate()-7);
+    var monthAgo=new Date(now);monthAgo.setDate(monthAgo.getDate()-30);
+
+    function mDate(x){return x.created_at?new Date(x.created_at):null;}
+    function fmtDate(d){return d?d.toISOString().slice(0,10):'—';}
+
+    var totSav=settled.reduce(function(s,x){return s+(+x.saving_amount||0);},0);
+    var todaySav=settled.filter(function(x){var d=mDate(x);return d&&d.toISOString().slice(0,10)===todayStr;}).reduce(function(s,x){return s+(+x.saving_amount||0);},0);
+    var weekSav=settled.filter(function(x){var d=mDate(x);return d&&d>=weekAgo;}).reduce(function(s,x){return s+(+x.saving_amount||0);},0);
+    var monthSav=settled.filter(function(x){var d=mDate(x);return d&&d>=monthAgo;}).reduce(function(s,x){return s+(+x.saving_amount||0);},0);
+
+    /* Day-wise */
+    var byDay={};
+    settled.forEach(function(x){var d=mDate(x);if(!d)return;var k=d.toISOString().slice(0,10);byDay[k]=(byDay[k]||0)+(+x.saving_amount||0);});
+    var dayRows=Object.keys(byDay).sort().reverse().slice(0,30).map(function(d){return '<tr><td class="dim">'+d+'</td><td class="r mono" style="color:var(--green);font-weight:600">'+fN(Math.round(byDay[d]))+' USD</td></tr>';}).join('');
+
+    /* Week-wise */
+    function getWeekKey(d){var t=new Date(d);var day=t.getDay()||7;t.setDate(t.getDate()-day+1);return t.toISOString().slice(0,10);}
+    var byWeek={};
+    settled.forEach(function(x){var d=mDate(x);if(!d)return;var k=getWeekKey(d);byWeek[k]=(byWeek[k]||0)+(+x.saving_amount||0);});
+    var weekRows=Object.keys(byWeek).sort().reverse().slice(0,12).map(function(w){return '<tr><td class="dim">Week of '+w+'</td><td class="r mono" style="color:var(--green);font-weight:600">'+fN(Math.round(byWeek[w]))+' USD</td></tr>';}).join('');
+
+    /* Month-wise */
+    var byMonth={};
+    settled.forEach(function(x){var d=mDate(x);if(!d)return;var k=d.toISOString().slice(0,7);byMonth[k]=(byMonth[k]||0)+(+x.saving_amount||0);});
+    var monthRows=Object.keys(byMonth).sort().reverse().map(function(mk){return '<tr><td class="dim">'+mk+'</td><td class="r mono" style="color:var(--green);font-weight:600">'+fN(Math.round(byMonth[mk]))+' USD</td></tr>';}).join('');
+
+    /* Company-wise */
+    var byCo={};
+    settled.forEach(function(x){
+      [x.buy_company,x.sell_company].forEach(function(co){if(!co)return;byCo[co]=(byCo[co]||0)+(+x.saving_amount||0)/2;});
+    });
+    var coRows=COS.map(function(c){return '<tr><td style="font-weight:600">'+c.n+'<span class="dim" style="font-size:11px;margin-left:4px">('+c.short+')</span></td><td class="r mono" style="color:var(--green);font-weight:600">'+fN(Math.round(byCo[c.id]||0))+' USD</td></tr>';}).join('');
+
+    /* Group-wise */
+    var byGrp={};
+    settled.forEach(function(x){
+      if(x.buy_group){byGrp[x.buy_group]=(byGrp[x.buy_group]||0)+(+x.saving_amount||0)/2;}
+      if(x.sell_group){byGrp[x.sell_group]=(byGrp[x.sell_group]||0)+(+x.saving_amount||0)/2;}
+    });
+    var grpRows=Object.keys(byGrp).sort(function(a,b){return byGrp[b]-byGrp[a];}).map(function(g){return '<tr><td style="font-weight:600">'+g+'</td><td class="r mono" style="color:var(--green);font-weight:600">'+fN(Math.round(byGrp[g]))+' USD</td></tr>';}).join('');
+
+    /* Transaction-wise */
+    var txRows=settled.slice().sort(function(a,b){return new Date(b.created_at)-new Date(a.created_at);}).map(function(x){return '<tr><td class="dim mono" style="font-size:11px">'+x.match_no+'</td><td class="dim">'+fmtDate(mDate(x))+'</td><td>'+badge('buy',x.buy_company||'—')+'</td><td>'+badge('sell',x.sell_company||'—')+'</td><td class="dim">'+x.currency_pair+'</td><td class="r mono">'+fN(x.matched_amount||0)+'</td><td class="r mono" style="color:var(--green);font-weight:600">'+fN(Math.round(+x.saving_amount||0))+'</td></tr>';}).join('');
+
+    m.innerHTML='<div class="fadein">'+
+      '<div class="page-hdr"><div><div class="page-title">Savings Dashboard</div><div class="page-sub">Internal netting savings · all breakdowns</div></div></div>'+
+      '<div class="grid-4">'+
+        kpi('Total Savings',fN(Math.round(totSav))+' USD','all-time','green')+
+        kpi('Today',fN(Math.round(todaySav))+' USD','today\'s savings','teal')+
+        kpi('Last 7 Days',fN(Math.round(weekSav))+' USD','weekly savings','blue')+
+        kpi('Last 30 Days',fN(Math.round(monthSav))+' USD','monthly savings','purple')+
+      '</div>'+
+      '<div class="ch-grid-3">'+
+        '<div class="card"><div class="card-hdr"><div class="card-title">Company-wise Savings</div></div>'+
+          '<div class="tbl-w"><table><thead><tr><th>Company</th><th class="r">Savings</th></tr></thead><tbody>'+coRows+'</tbody></table></div></div>'+
+        '<div class="card"><div class="card-hdr"><div class="card-title">Day-wise Savings</div><span style="font-size:11px;color:var(--text3)">Last 30 days</span></div>'+
+          '<div class="tbl-w" style="max-height:280px;overflow-y:auto"><table><thead><tr><th>Date</th><th class="r">Savings</th></tr></thead><tbody>'+
+          (dayRows||'<tr><td colspan="2" class="empty" style="padding:14px">No data</td></tr>')+
+          '</tbody></table></div></div>'+
+        '<div class="card"><div class="card-hdr"><div class="card-title">Group-wise Savings</div></div>'+
+          '<div class="tbl-w" style="max-height:280px;overflow-y:auto"><table><thead><tr><th>Group</th><th class="r">Savings</th></tr></thead><tbody>'+
+          (grpRows||'<tr><td colspan="2" class="empty" style="padding:14px">No data</td></tr>')+
+          '</tbody></table></div></div>'+
+      '</div>'+
+      '<div class="ch-grid-2">'+
+        '<div class="card"><div class="card-hdr"><div class="card-title">Week-wise Savings</div><span style="font-size:11px;color:var(--text3)">Last 12 weeks</span></div>'+
+          '<div class="tbl-w"><table><thead><tr><th>Week Starting</th><th class="r">Savings</th></tr></thead><tbody>'+
+          (weekRows||'<tr><td colspan="2" class="empty" style="padding:14px">No data</td></tr>')+
+          '</tbody></table></div></div>'+
+        '<div class="card"><div class="card-hdr"><div class="card-title">Month-wise Savings</div></div>'+
+          '<div class="tbl-w"><table><thead><tr><th>Month</th><th class="r">Savings</th></tr></thead><tbody>'+
+          (monthRows||'<tr><td colspan="2" class="empty" style="padding:14px">No data</td></tr>')+
+          '</tbody></table></div></div>'+
+      '</div>'+
+      '<div class="card"><div class="card-hdr"><div class="card-title">Transaction-wise Savings</div><span style="font-size:11px;color:var(--text3)">'+settled.length+' matched transactions</span></div>'+
+        (txRows?'<div class="tbl-w"><table><thead><tr><th>Match No.</th><th>Date</th><th>Buyer</th><th>Seller</th><th>Pair</th><th class="r">Amount</th><th class="r">Saving</th></tr></thead><tbody>'+txRows+'</tbody></table></div>':
+        '<div class="empty"><div class="empty-icon">💰</div><div class="empty-title">No settled matches yet</div><div class="empty-sub">Savings appear once matches are confirmed</div></div>')+
+      '</div>'+
+    '</div>';
+  }catch(e){document.getElementById('mainArea').innerHTML='<div class="alert danger">'+e.message+'</div>';}
+}
+
 /* ══ COUNTDOWN TIMERS ══ */
 function cdCls(dl){if(!dl)return 'ok';var d=new Date(dl)-new Date();if(d<=0||d<600000)return 'urgent';if(d<1800000)return 'warn';return 'ok';}
 function cdFmt(dl){if(!dl)return '—';var d=new Date(dl)-new Date();if(d<=0)return 'EXPIRED';var h=Math.floor(d/3600000),mn=Math.floor((d%3600000)/60000),s=Math.floor((d%60000)/1000);return(h>0?h+'h ':'')+String(mn).padStart(2,'0')+'m '+String(s).padStart(2,'0')+'s';}
@@ -1447,7 +1632,7 @@ setInterval(function(){if(CU&&(CPage==='dashboard'||CPage==='settlements'||CPage
 (function(){
   applyTheme();
   // Check SSO session
-  try{var s=localStorage.getItem('grf_sso');if(s){var ss=JSON.parse(s);if(ss&&ss.exp&&ss.exp>Date.now()){CU={id:ss.id,name:ss.name,email:ss.email,role:ss.role,company_code:ss.co||''};startApp();return;}}}catch(e){}
+  try{var s=localStorage.getItem('grf_sso');if(s){var ss=JSON.parse(s);if(ss&&ss.exp&&ss.exp>Date.now()){CU={id:ss.id,name:ss.name,email:ss.email,role:ss.role,company_code:ss.co||'',can_view_fx_deal_page:ss.fx===true};startApp();return;}}}catch(e){}
   document.getElementById('loginPage').style.display='flex';
   // Enter key on login
   ['loginEmail','loginPin'].forEach(function(id){var el=document.getElementById(id);if(el)el.addEventListener('keydown',function(e){if(e.key==='Enter')doLogin();});});
