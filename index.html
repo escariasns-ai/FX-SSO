@@ -616,7 +616,7 @@ function dealDateLbl(d){var dt=parseDealDate(d.deal_date||d.created_at);return d
    INTERNAL FX MATCHING
 ══════════════════════════════════════════════ */
 async function getTodayRate(pair){
-  try{var t=new Date().toISOString().slice(0,10);var q='select=*&rate_date=eq.'+t+(pair?'&currency_pair=eq.'+encodeURIComponent(pair):'')+'&order=created_at.desc&limit=1';var r=await sbGet('ifx_daily_rates',q);return r.length?r[0]:null;}
+  try{var t=new Date().toISOString().slice(0,10);var q='select=*&rate_date=eq.'+t+(pair?'&currency_pair=eq.'+pair:'')+'&order=created_at.desc&limit=1';var r=await sbGet('ifx_daily_rates',q);return r.length?r[0]:null;}
   catch(e){return null;}
 }
 async function runAutoMatch(){
