@@ -1439,14 +1439,20 @@ function setRate(){requirePwd(async function(){
   var pair=document.getElementById('rPair').value,cfg=FX_CFG[pair]||FX_CFG['EUR/USD'];
   var ir=parseFloat(document.getElementById('rIn').value),bm=parseFloat(document.getElementById('rMid').value),sl=parseInt(document.getElementById('rSettle').value)||60;
   var msg=document.getElementById('rateMsg');
-  if(!ir||!bm||ir<cfg.mn||ir>cfg.mx){msg.innerHTML='<div class="err-msg">Enter valid '+pair+' rate ('+cfg.mn+' – '+cfg.mx+').</div>';return;}
+  if(!ir||!bm||ir<cfg.mn||ir>cfg.mx){
+    msg.innerHTML='<div class="err-msg">⚠ Enter a valid '+pair+' Internal Rate and Bank Mid (range: '+cfg.mn+' – '+cfg.mx+').</div>';
+    msg.scrollIntoView({behavior:'smooth',block:'center'});
+    return;
+  }
   try{
+    msg.innerHTML='<div class="alert info">Saving...</div>';
     SETTLE_MINS=sl;var t=new Date().toISOString().slice(0,10);
     await sbUpsert('ifx_daily_rates',{rate_date:t,currency_pair:pair,internal_rate:ir,bank_mid:bm,set_by:CU.name,created_at:new Date().toISOString()},'rate_date,currency_pair');
     await logAudit('RATE_SET','rate',t,pair+' Internal:'+ir+' Mid:'+bm);
     msg.innerHTML='<div class="ok-msg">✅ '+pair+' rate set for '+t+'</div>';
+    msg.scrollIntoView({behavior:'smooth',block:'center'});
     setTimeout(pgRate,1800);
-  }catch(e){msg.innerHTML='<div class="err-msg">'+e.message+'</div>';}
+  }catch(e){msg.innerHTML='<div class="err-msg">Error: '+e.message+'</div>';msg.scrollIntoView({behavior:'smooth',block:'center'});}
 });}
 
 async function pgUsers(){
