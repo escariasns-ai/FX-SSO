@@ -561,7 +561,7 @@ function openFxPage(){
 
 /* ══ PWD MODAL ══ */
 function requirePwd(cb){pwdCB=cb;document.getElementById('pwdInput').value='';document.getElementById('pwdErr').style.display='none';document.getElementById('pwdModal').classList.add('open');setTimeout(function(){document.getElementById('pwdInput').focus();},80);}
-function checkPwd(){if(document.getElementById('pwdInput').value===ADMIN_PWD){closePwdModal();if(pwdCB)pwdCB();}else{document.getElementById('pwdErr').style.display='block';}}
+function checkPwd(){if(document.getElementById('pwdInput').value===ADMIN_PWD){var cb=pwdCB;closePwdModal();if(cb)cb();}else{document.getElementById('pwdErr').style.display='block';}}
 function closePwdModal(){document.getElementById('pwdModal').classList.remove('open');pwdCB=null;}
 function closeModal(id){document.getElementById(id).classList.remove('open');}
 document.addEventListener('keydown',function(e){
