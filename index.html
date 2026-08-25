@@ -567,18 +567,47 @@ function canSee(page,role,user){
 function sessionKey(){return 'grf_sso';}
 
 /* Returns {user, token} on success, null on bad credentials. */
+function isBlocked(e){
+  return !!(e&&(e.status===401||e.status===403||/permission denied|42501|row-level security/i.test(e.body||e.message||'')));
+}
+
+/* Raised when the migration has run (table locked down) but PostgREST is not
+   serving the new functions yet — the one state where nobody can sign in. */
+function schemaCacheError(){
+  var e=new Error(
+    'The database is locked down but the login function is not being served yet. '+
+    'This is PostgREST\'s schema cache, not your PIN. In the Supabase SQL editor run:  '+
+    'notify pgrst, \'reload schema\';   then try again.');
+  e.schemaCache=true;
+  return e;
+}
+
 async function verifyCredentials(email,pin){
-  try{
-    var out=await sbRpc('verify_login',{p_email:email,p_pin:String(pin)});
-    if(Array.isArray(out))out=out.length?out[0]:null;
-    if(!out||!out.id)return null;
-    return {user:out,token:out.session_token||null};
-  }catch(err){
-    if(!rpcMissing(err))throw err;
+  var rpcGone=false;
+  for(var attempt=0;attempt<2;attempt++){
+    try{
+      var out=await sbRpc('verify_login',{p_email:email,p_pin:String(pin)});
+      if(Array.isArray(out))out=out.length?out[0]:null;
+      if(!out||!out.id)return null;
+      return {user:out,token:out.session_token||null};
+    }catch(err){
+      if(!rpcMissing(err))throw err;
+      rpcGone=true;
+      /* One retry: a schema-cache reload can land between the two calls. */
+      if(attempt===0)await new Promise(function(r){setTimeout(r,600);});
+    }
   }
-  /* ── legacy fallback (pre-migration) ── */
-  console.warn('verify_login RPC not found — falling back to client-side PIN check. Run migration.sql.');
-  var rows=await sbGet('ifx_users','select=*&email=eq.'+encodeURIComponent(email));
+
+  /* ── legacy fallback, only meaningful before the migration ── */
+  console.warn('verify_login RPC not found — trying the pre-migration path.');
+  var rows;
+  try{
+    rows=await sbGet('ifx_users','select=*&email=eq.'+encodeURIComponent(email));
+  }catch(err){
+    /* Table locked AND function missing: say what is actually wrong. */
+    if(rpcGone&&isBlocked(err))throw schemaCacheError();
+    throw err;
+  }
   rows=rows.filter(function(r){return flagOn(r.active===undefined?true:r.active);});
   if(!rows.length)return null;
   if(String(rows[0].pin)!==String(pin))return null;
@@ -598,7 +627,8 @@ async function resolveSession(stored){
   if(!stored.id)return null;
   try{
     var rows=await sbGet('ifx_users','select=id,name,email,role,company_code,can_view_fx_deal_page,active&id=eq.'+encodeURIComponent(stored.id));
-    if(!rows.length||rows[0].active===false)return null;
+    if(!rows.length)return null;
+    if(rows[0].active!==undefined&&!flagOn(rows[0].active))return null;
     return rows[0];
   }catch(e){return null;}
 }
@@ -629,7 +659,13 @@ async function doLogin(){
     logAudit('LOGIN','user',CU.id,'Login');
     startApp();
   }catch(e){
-    errEl.textContent=e.message||'Sign in failed';errEl.style.display='block';
+    if(e.schemaCache){
+      errEl.innerHTML='<b>Schema cache out of date</b><br>'+esc(e.message)+
+        '<br><br>If that does not help, run <code>diagnose.sql</code> to see which functions exist.';
+    }else{
+      errEl.textContent=e.message||'Sign in failed';
+    }
+    errEl.style.display='block';
   }finally{
     btn.textContent='Sign In →';btn.disabled=false;
     document.getElementById('loginPin').value='';
