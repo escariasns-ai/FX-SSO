@@ -544,11 +544,25 @@ function closeMobNav(){
    migration.sql has been applied — it warns loudly when it is used.      */
 function isAdminRole(r){return r==='admin'||r==='super_admin';}
 function isSuperAdmin(r){return r==='super_admin';}
-function canSee(page,role){
+/* The database stores can_view_fx_deal_page as text ('true'/'yes'/'1'),
+   not a boolean, so a plain ===true test silently denies access. */
+function flagOn(v){
+  if(v===true)return true;
+  if(v===false||v===null||v===undefined)return false;
+  return ['true','t','yes','y','1','on'].indexOf(String(v).trim().toLowerCase())!==-1;
+}
+/* Rows whose `active` flag reads true. A missing column counts as active. */
+function activeOnly(rows){return (rows||[]).filter(function(r){return r.active===undefined||r.active===null?true:flagOn(r.active);});}
+var FX_PAGES=['fxapp','dealentry','dealdash','dealhistory'];
+function canSee(page,role,user){
+  var u=user||CU||{};
   var allowed=PAGE_ROLES[page];
   if(!allowed)return false;
   if(allowed==='*')return true;
-  return allowed.indexOf(role)!==-1;
+  if(allowed.indexOf(role)!==-1)return true;
+  /* explicit per-user grant, the way the original app intended it */
+  if(FX_PAGES.indexOf(page)!==-1&&flagOn(u.can_view_fx_deal_page))return true;
+  return false;
 }
 function sessionKey(){return 'grf_sso';}
 
@@ -564,7 +578,8 @@ async function verifyCredentials(email,pin){
   }
   /* ── legacy fallback (pre-migration) ── */
   console.warn('verify_login RPC not found — falling back to client-side PIN check. Run migration.sql.');
-  var rows=await sbGet('ifx_users','select=*&email=eq.'+encodeURIComponent(email)+'&active=eq.true');
+  var rows=await sbGet('ifx_users','select=*&email=eq.'+encodeURIComponent(email));
+  rows=rows.filter(function(r){return flagOn(r.active===undefined?true:r.active);});
   if(!rows.length)return null;
   if(String(rows[0].pin)!==String(pin))return null;
   var u=rows[0];delete u.pin;
@@ -982,7 +997,7 @@ async function confirmSettle(){if(!settleId)return;try{await sbPatch('ifx_matche
 async function pgSubmit(){
   var m=document.getElementById('mainArea');
   try{
-    var[groups,rate]=await Promise.all([sbGet('ifx_groups','select=*&active=eq.true&order=company_code.asc'),getTodayRate()]);
+    var[groups,rate]=await Promise.all([sbGet('ifx_groups','select=*&order=company_code.asc').then(activeOnly),getTodayRate()]);
     window._allGrps=groups;
     m.innerHTML='<div class="fadein">'+
       '<div class="page-hdr"><div><div class="page-title">New FX Request</div><div class="page-sub">Submit a buy or sell for internal netting</div></div></div>'+
@@ -1048,8 +1063,8 @@ async function pgDealEntry(){
   var m=document.getElementById('mainArea');
   fxCalc=null;fxSpot=null;
   var banks=[],gbs=[];
-  try{banks=await sbGet('bank_master','select=*&active=eq.true&order=bank_id');}catch(e){}
-  try{gbs=await sbGet('given_by_master','select=*&active=eq.true&order=name');}catch(e){}
+  try{banks=activeOnly(await sbGet('bank_master','select=*&order=bank_id'));}catch(e){}
+  try{gbs=activeOnly(await sbGet('given_by_master','select=*&order=name'));}catch(e){}
   window._fxBanks=banks;window._fxGbs=gbs;
   m.innerHTML='<div class="fadein">'+
     '<div class="page-hdr"><div><div class="page-title">FX Deal Entry</div><div class="page-sub">Negotiate and confirm interbank forex deals</div></div></div>'+
