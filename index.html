@@ -489,6 +489,12 @@ async function sbRpc(fn,args){
 }
 function rpcMissing(e){return !!(e&&e.missing);}
 
+/* Deferred page refresh that gives up if the user has navigated away —
+   otherwise a "saved!" refresh 1.5s later redraws over whatever they opened. */
+function refreshIf(page,fn,ms){
+  setTimeout(function(){ if(CPage===page&&CU)fn(); }, ms||1400);
+}
+
 /* Banner shown to admins while the server-side hardening is not in place. */
 function migrationBanner(){
   if(!MIGRATION_PENDING||!CU||!isAdminRole(CU.role))return '';
@@ -1644,7 +1650,7 @@ function setRate(){requirePwd(async function(){
     await logAudit('RATE_SET','rate',r.date,pair+' Internal:'+ir+' Mid:'+bm+' ('+r.mode+')');
     show('<div class="ok-msg">&#9989; '+esc(pair)+' rate '+(r.mode==='update'?'updated':'set')+' for '+esc(r.date)+
       ' — internal '+esc(ir)+', bank mid '+esc(bm)+'.</div>');
-    setTimeout(pgRate,1500);
+    refreshIf('rate',pgRate,1500);
   }catch(e){
     show('<div class="err-msg"><b>Could not save the rate.</b><br>'+esc(e.message||String(e))+
       (e.status===401||e.status===403?'<br>The database rejected the write — check the RLS policy on <code>ifx_daily_rates</code>.':'')+
@@ -1734,7 +1740,7 @@ async function createUser(){
     await logAudit('USER_CREATED','user',em,'Created as '+r);
     msg.innerHTML='<div class="ok-msg">&#9989; User created. Give them their PIN directly — it is not shown again.</div>';
     document.getElementById('uPin').value='';
-    setTimeout(pgUsers,1800);
+    refreshIf('users',pgUsers,1800);
   }catch(e){msg.innerHTML='<div class="err-msg">'+esc(e.message)+'</div>';}
 }
 
@@ -1822,7 +1828,7 @@ async function createGroup(){
     await sbPost('ifx_groups',{company_code:co,name:n,bank_account:b,iban:ib,active:true,created_at:new Date().toISOString()});
     await logAudit('GROUP_CREATE','group',b||n,co+' / '+n);
     msg.innerHTML='<div class="ok-msg">&#9989; Account created.</div>';
-    setTimeout(pgGroups,1200);
+    refreshIf('groups',pgGroups,1200);
   }catch(e){msg.innerHTML='<div class="err-msg">'+esc(e.message)+'</div>';}
 }
 
@@ -1964,7 +1970,7 @@ function commitGrpImport(btn){
           done=rows.length;tick();
           await logAudit('GROUP_IMPORT','group','bulk',rows.length+' accounts ('+GRP_IMPORT.ins+' new, '+GRP_IMPORT.upd+' updated)');
           prog.innerHTML='<div class="ok-msg">&#9989; Imported '+esc(rows.length)+' accounts.</div>';
-          setTimeout(pgGroups,1400);return;
+          refreshIf('groups',pgGroups,1400);return;
         }catch(err){ if(!rpcMissing(err))throw err; }
       }
       /* Fallback: row by row over REST. */
@@ -1983,7 +1989,7 @@ function commitGrpImport(btn){
       prog.innerHTML=(failed.length?
         '<div class="alert warn">Imported '+esc(done)+' of '+esc(rows.length)+'. '+esc(failed.length)+' failed — first: row '+esc(failed[0].line)+', '+esc(failed[0].why)+'</div>':
         '<div class="ok-msg">&#9989; Imported '+esc(done)+' accounts.</div>');
-      if(!failed.length)setTimeout(pgGroups,1400);
+      if(!failed.length)refreshIf('groups',pgGroups,1400);
     }catch(e){
       prog.innerHTML='<div class="err-msg"><b>Import failed.</b><br>'+esc(e.message||String(e))+'</div>';
       console.error('import failed',e);
